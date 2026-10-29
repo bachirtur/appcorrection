@@ -1,0 +1,137 @@
+rules_version = '2';
+
+// ============================================================================
+// EDUEXAM (Projet Firebase : appcorrection) — RÈGLES DE SÉCURITÉ FIRESTORE
+// ============================================================================
+// Principes appliqués :
+// 1. Refus par défaut absolu sur toute la base de données.
+// 2. Isolation stricte inter-professeurs : un professeur authentifié ne peut
+//    lire ou modifier que les ressources dont `teacherId == request.auth.uid`.
+// 3. Confidentialité absolue des corrigés et barèmes attendus (`examSecrets`) :
+//    aucun élève ni utilisateur non propriétaire ne peut lire ces documents.
+// 4. Contrôle côté serveur pour l'espace élève : la vérification du code
+//    d'accès, le chronomètre (`examSessions`), les sauvegardes et la soumission
+//    finale passent exclusivement par les Cloud Functions (Admin SDK).
+// 5. Immuabilité du journal d'audit (`auditLogs`) : écriture réservée au
+//    serveur uniquement, lecture réservée au professeur propriétaire.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedTeacher(uid) {
+      return isSignedIn()
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(teacherId) {
+      return isSignedIn() && request.auth.uid == teacherId;
+    }
+
+    function validString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // ------------------------------------------------------------------------
+    // Profils professeurs (strictement privés, non consultables par les élèves)
+    // ------------------------------------------------------------------------
+    match /teachers/{teacherId} {
+      allow read: if isOwner(teacherId);
+      allow create: if isOwner(teacherId)
+        && request.resource.data.uid == teacherId
+        && request.resource.data.role == 'teacher'
+        && validString(request.resource.data.firstName, 1, 100)
+        && validString(request.resource.data.lastName, 1, 100)
+        && validString(request.resource.data.email, 5, 180)
+        && request.resource.data.acceptedTerms == true;
+      allow update: if isOwner(teacherId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == 'teacher';
+      allow delete: if false; // Suppression gérée côté serveur avec ré-authentification
+    }
+
+    // ------------------------------------------------------------------------
+    // Examens (métadonnées propriétaire — sans réponses attendues ni hash secret)
+    // Les élèves n'ont AUCUN accès direct à cette collection.
+    // ------------------------------------------------------------------------
+    match /exams/{examId} {
+      allow read: if isOwner(resource.data.teacherId);
+      allow create: if isSignedIn()
+        && request.resource.data.teacherId == request.auth.uid
+        && validString(request.resource.data.title, 2, 200)
+        && request.resource.data.durationMinutes is int
+        && request.resource.data.durationMinutes >= 5
+        && request.resource.data.durationMinutes <= 480
+        && request.resource.data.maxScore is number
+        && request.resource.data.maxScore > 0;
+      allow update: if isOwner(resource.data.teacherId)
+        && request.resource.data.teacherId == resource.data.teacherId;
+      allow delete: if isVerifiedTeacher(resource.data.teacherId)
+        && resource.data.status in ['draft', 'archived'];
+    }
+
+    // ------------------------------------------------------------------------
+    // Secrets d'examen (corrigé attendu, barème confidentiel, hash du code)
+    // Strictement inaccessibles aux élèves ; écriture sensible contrôlée.
+    // ------------------------------------------------------------------------
+    match /examSecrets/{examId} {
+      allow read: if isOwner(resource.data.teacherId);
+      allow create: if isSignedIn()
+        && request.resource.data.teacherId == request.auth.uid;
+      allow update: if isOwner(resource.data.teacherId)
+        && request.resource.data.teacherId == resource.data.teacherId
+        // Empêche la modification client directe du hash cryptographique généré serveur
+        && (!('accessCodeHash' in resource.data)
+            || request.resource.data.accessCodeHash == resource.data.accessCodeHash);
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Sessions d'évaluation élève (chronomètre serveur, tentatives, brouillons)
+    // Écriture exclusivement côté serveur (Cloud Functions) pour empêcher toute
+    // manipulation de l'horloge ou contournement de limite de tentatives.
+    // ------------------------------------------------------------------------
+    match /examSessions/{sessionId} {
+      allow read: if isOwner(resource.data.teacherId);
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Copies soumises et notes (`submissions`)
+    // Création et modification de note validée gérées par Cloud Functions afin
+    // de garantir l'intégrité du verrouillage et la traçabilité d'audit.
+    // ------------------------------------------------------------------------
+    match /submissions/{submissionId} {
+      allow read: if isOwner(resource.data.teacherId);
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Journal d'audit immuable (modifications de notes après validation, accès)
+    // ------------------------------------------------------------------------
+    match /auditLogs/{logId} {
+      allow read: if isOwner(resource.data.teacherId);
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Journal d'envoi des notifications e-mail
+    // ------------------------------------------------------------------------
+    match /emailLogs/{mailId} {
+      allow read: if isOwner(resource.data.teacherId);
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------------
+    // Refus global par défaut pour tout autre chemin
+    // ------------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

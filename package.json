@@ -1,0 +1,56 @@
+{
+  "name": "edu-exam-appcorrection",
+  "private": true,
+  "version": "1.0.0",
+  "description": "EduExam — Plateforme universelle d'évaluation scolaire en ligne sécurisée (Firebase appcorrection, Vercel & GitHub Pages)",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n API,WEB \"tsx server/index.ts\" \"vite --host 0.0.0.0 --port 5173\"",
+    "dev:web": "vite --host 0.0.0.0 --port 5173",
+    "dev:api": "tsx server/index.ts",
+    "build:api": "node scripts/build-vercel-api.mjs",
+    "build": "tsc -b && vite build && npm run build:api",
+    "build:functions": "npm --prefix functions run build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "firebase": "^12.19.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
+    "katex": "^0.19.1",
+    "lucide-react": "^0.475.0",
+    "multer": "^2.5.0",
+    "nodemailer": "^6.10.0",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.5"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/katex": "^0.16.7",
+    "@types/node": "^22.13.4",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/supertest": "^6.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.2",
+    "supertest": "^7.0.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}

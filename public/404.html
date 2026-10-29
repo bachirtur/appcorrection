@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirection — EduExam</title>
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        var base = path.indexOf('/appcorrection') === 0 ? '/appcorrection/' : '/';
+        window.location.replace(base + '#/');
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
