@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Build outputs
+dist/
+build/
+functions/lib/
+*.tsbuildinfo
+
+# Environment variables & Secrets (RÈGLE ABSOLUE : aucun secret versionné)
+.env
+.env.*
+!.env.example
+functions/.env
+functions/.env.*
+functions/.secret.local
+
+# Clés de compte de service Firebase / Google Cloud (JAMAIS versionnées)
+*firebase-adminsdk*.json
+service-account*.json
+google-credentials*.json
+*.pem
+*.key
+
+# Firebase local cache & emulators
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+storage-debug.log
+
+# Données locales de développement / stockage privé du serveur local
+server/.data/
+.data/
+coverage/
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo

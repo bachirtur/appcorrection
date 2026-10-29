@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// ============================================================================
+// EDUEXAM (Projet Firebase : appcorrection) — RÈGLES CLOUD STORAGE PRIVÉES
+// ============================================================================
+// 1. Aucun fichier n'est publiquement lisible.
+// 2. Les sujets PDF (`private_subject`) ne sont directement accessibles en
+//    lecture/écriture qu'au professeur propriétaire authentifié. Les élèves
+//    reçoivent un flux ou une autorisation temporaire générée côté serveur
+//    après validation de leur session active.
+// 3. Les corrigés officiels PDF (`confidential_correction`) ne sont JAMAIS
+//    accessibles aux élèves ni exposés par une fonction élève.
+// 4. Vérification stricte de la taille et du type MIME (`application/pdf`, etc.).
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isTeacherOwner(teacherId) {
+      return request.auth != null && request.auth.uid == teacherId;
+    }
+
+    function isValidPdf(maxMb) {
+      return request.resource != null
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size > 0
+        && request.resource.size <= maxMb * 1024 * 1024;
+    }
+
+    // Sujet d'examen privé du professeur (max 25 Mo, PDF uniquement)
+    match /exams/{teacherId}/{examId}/private_subject/{fileName} {
+      allow read: if isTeacherOwner(teacherId);
+      allow write: if isTeacherOwner(teacherId) && (request.resource == null || isValidPdf(25));
+    }
+
+    // Corrigé officiel STRICTEMENT CONFIDENTIEL (max 25 Mo, PDF uniquement)
+    match /exams/{teacherId}/{examId}/confidential_correction/{fileName} {
+      allow read: if isTeacherOwner(teacherId);
+      allow write: if isTeacherOwner(teacherId) && (request.resource == null || isValidPdf(25));
+    }
+
+    // Pièces jointes élèves et rapports générés (gérés via Cloud Functions Admin SDK,
+    // lecture directe autorisée uniquement au professeur propriétaire)
+    match /submissions/{teacherId}/{examId}/{submissionId}/{allFiles=**} {
+      allow read: if isTeacherOwner(teacherId);
+      allow write: if false;
+    }
+
+    // Refus par défaut absolu sur tout autre chemin
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
